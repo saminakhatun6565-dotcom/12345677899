@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AYA & EHE Secure Chat Vault</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Mobile and Desktop full screen absolute fix using dynamic viewport */
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0e1621;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0e1621; }
+        ::-webkit-scrollbar-thumb { background: #2b5278; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full flex items-center justify-center text-gray-100 font-sans select-none">
+
+    <!-- App Wrapper with strict full height fitting -->
+    <div class="w-full h-full max-w-4xl bg-[#0e1621] flex flex-col shadow-2xl relative overflow-hidden border-0 sm:border border-[#2b3b4e] sm:rounded-2xl">
+
+        <!-- ================= AUTH SCREEN ================= -->
+        <div id="authScreen" class="absolute inset-0 bg-[#0f212e] z-50 flex items-center justify-center p-4">
+            <div class="bg-[#17212b] border border-[#2b3b4e] rounded-3xl w-full max-w-sm p-6 sm:p-8 shadow-2xl flex flex-col items-center space-y-6">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-3xl shadow-lg text-white animate-pulse">
+                    <i class="fa-solid fa-user-shield text-white"></i>
+                </div>
+                <div class="text-center">
+                    <h2 class="text-xl font-extrabold text-white">Secure Login</h2>
+                    <p class="text-xs text-sky-400 mt-1 font-medium">लॉगिन में अपना नाम (<span class="text-white font-bold">AYA</span> या <span class="text-white font-bold">EHE</span>) दर्ज करें</p>
+                </div>
+
+                <input type="text" id="identityInput" placeholder="AYA या EHE लिखें..." 
+                    class="w-full bg-[#0e1621] border border-[#2b3b4e] rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-gray-500 text-center tracking-wider font-bold uppercase"
+                    onkeypress="if(event.key === 'Enter') verifyAndLogin()">
+
+                <button onclick="verifyAndLogin()" class="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white py-3.5 rounded-2xl font-bold transition shadow-lg transform active:scale-95">
+                    चैट में प्रवेश करें 🚀
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= MAIN CHAT UI ================= -->
+        <!-- Header (Shrink-0 to prevent collapsing) -->
+        <header class="bg-[#17212b] border-b border-[#2b3b4e] px-4 py-3 flex justify-between items-center shadow-md z-10 shrink-0">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center font-bold text-lg text-white shadow-md" id="headerAvatar">
+                    A
+                </div>
+                <div>
+                    <h1 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <span id="chatPartnerName">Connecting...</span>
+                    </h1>
+                    <p class="text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Cloud Sync Active
+                    </p>
+                </div>
+            </div>
+
+            <button onclick="lockApp()" class="text-gray-400 hover:text-red-400 p-2.5 rounded-xl hover:bg-[#2b3b4e] transition" title="Logout / Lock">
+                <i class="fa-solid fa-right-from-bracket text-lg"></i>
+            </button>
+        </header>
+
+        <!-- Chat Messages Container (Flex-1 & min-h-0 ensures proper scrolling and no overflow) -->
+        <main id="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#0e1621] flex flex-col min-h-0">
+            <div class="text-center text-gray-500 my-auto text-sm">क्लाउड से डेटा लोड हो रहा है...</div>
+        </main>
+
+        <!-- Image Preview Area (Shrink-0) -->
+        <div id="imagePreviewContainer" class="hidden px-4 py-2.5 bg-[#17212b] border-t border-[#2b3b4e] flex items-center justify-between shrink-0">
+            <div class="flex items-center space-x-3">
+                <img id="previewImg" src="" alt="Preview" class="w-12 h-12 object-cover rounded-xl border-2 border-sky-500 shadow">
+                <span class="text-xs text-gray-300 truncate max-w-[200px] sm:max-w-xs font-medium" id="previewFileName">Image selected</span>
+            </div>
+            <button onclick="cancelImage()" class="text-red-400 hover:text-red-300 text-sm font-semibold p-2 rounded-lg hover:bg-red-500/10 transition">
+                <i class="fa-solid fa-xmark text-base"></i> हटाएँ
+            </button>
+        </div>
+
+        <!-- Chat Input Footer (Strictly locked to bottom and shrink-0 so it never hides) -->
+        <footer class="bg-[#17212b] border-t border-[#2b3b4e] p-3 flex items-center space-x-2 shrink-0">
+            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
+            
+            <button onclick="document.getElementById('imageInput').click()" class="text-gray-400 hover:text-sky-400 p-2.5 rounded-xl hover:bg-[#2b3b4e] transition shrink-0" title="फोटो भेजें">
+                <i class="fa-solid fa-image text-lg"></i>
+            </button>
+
+            <button id="recordBtn" onclick="toggleRecordVoice()" class="text-gray-400 hover:text-red-400 p-2.5 rounded-xl hover:bg-[#2b3b4e] transition shrink-0" title="वॉयस रिकॉर्ड करें">
+                <i class="fa-solid fa-microphone text-lg" id="micIcon"></i>
+            </button>
+
+            <input type="text" id="messageInput" placeholder="संदेश लिखें..." 
+                class="flex-1 bg-[#0e1621] border border-[#2b3b4e] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-gray-500 shadow-inner min-w-0"
+                onkeypress="if(event.key === 'Enter') handleMessageSubmit()">
+
+            <button id="sendBtn" onclick="handleMessageSubmit()" class="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white p-3 px-5 rounded-2xl shadow-md transition flex items-center justify-center transform active:scale-95 shrink-0">
+                <i class="fa-solid fa-paper-plane text-sm"></i>
+            </button>
+        </footer>
+
+    </div>
+
+    <!-- Message Options Modal -->
+    <div id="actionModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-[#17212b] border border-[#2b3b4e] rounded-3xl w-full max-w-xs p-5 shadow-2xl flex flex-col space-y-3">
+            <h3 class="text-sm font-bold text-gray-300 text-center border-b border-[#2b3b4e] pb-2">मैसेज विकल्प</h3>
+            <button onclick="editSelectedMessage()" id="editOptionBtn" class="w-full bg-[#2b3b4e] hover:bg-[#34495e] text-sky-300 font-medium py-3 rounded-2xl transition flex items-center justify-center gap-2 shadow-sm">
+                <i class="fa-solid fa-pen"></i> एडिट करें
+            </button>
+            <button onclick="deleteSelectedMessage()" class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-3 rounded-2xl transition flex items-center justify-center gap-2 border border-red-500/30 shadow-sm">
+                <i class="fa-solid fa-trash"></i> डिलीट करें
+            </button>
+            <button onclick="closeActionModal()" class="w-full text-gray-400 hover:text-white py-2 text-sm font-medium transition">
+                रद्द करें
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase Realtime Database Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, set, remove, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            databaseURL: "https://qwee-6ea65-default-rtdb.firebaseio.com/",
+            projectId: "qwee-6ea65"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const chatRef = ref(db, 'aya_ehe_dynamic_chats');
+
+        let currentIdentity = localStorage.getItem('aya_ehe_dynamic_identity') || null;
+
+        let selectedImageBase64 = null;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let activeMessageKey = null;
+        let editingMsgKey = null;
+        let pressTimer = null;
+        let cachedMessages = {};
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (currentIdentity) {
+                document.getElementById('authScreen').classList.add('hidden');
+                setupInterface();
+                initRealtimeCloudSync();
+            } else {
+                document.getElementById('authScreen').classList.remove('hidden');
+            }
+        });
+
+        window.verifyAndLogin = function() {
+            const val = document.getElementById('identityInput').value.trim().toUpperCase();
+            if (val !== 'AYA' && val !== 'EHE') {
+                alert('कृपया सही नाम दर्ज करें: केवल AYA या EHE मान्य है!');
+                return;
+            }
+
+            currentIdentity = val;
+            localStorage.setItem('aya_ehe_dynamic_identity', currentIdentity);
+            document.getElementById('authScreen').classList.add('hidden');
+            setupInterface();
+            initRealtimeCloudSync();
+        };
+
+        window.lockApp = function() {
+            localStorage.removeItem('aya_ehe_dynamic_identity');
+            location.reload();
+        };
+
+        function setupInterface() {
+            document.getElementById('headerAvatar').innerText = currentIdentity.charAt(0);
+            document.getElementById('chatPartnerName').innerText = currentIdentity === 'AYA' ? 'Logged in as AYA (Live)' : 'Logged in as EHE (Live)';
+        }
+
+        function initRealtimeCloudSync() {
+            onValue(chatRef, (snapshot) => {
+                const data = snapshot.val();
+                cachedMessages = data || {};
+                renderMessages(cachedMessages);
+            }, (error) => {
+                console.error("Cloud Error:", error);
+            });
+        }
+
+        window.handleMessageSubmit = async function() {
+            const textInput = document.getElementById('messageInput');
+            const text = textInput.value.trim();
+
+            if (!text && !selectedImageBase64) return;
+
+            try {
+                if (editingMsgKey !== null) {
+                    await update(ref(db, 'aya_ehe_dynamic_chats/' + editingMsgKey), {
+                        text: text,
+                        edited: true
+                    });
+                    editingMsgKey = null;
+                    document.getElementById('sendBtn').innerHTML = '<i class="fa-solid fa-paper-plane text-sm"></i>';
+                } else {
+                    const newMsgRef = push(chatRef);
+                    await set(newMsgRef, {
+                        sender: currentIdentity,
+                        text: text,
+                        image: selectedImageBase64,
+                        audio: null,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        createdAt: Date.now(),
+                        edited: false
+                    });
+                }
+                textInput.value = '';
+                cancelImage();
+            } catch (err) {
+                console.error("Send Error:", err);
+            }
+        };
+
+        window.handleImageSelect = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImageBase64 = e.target.result;
+                    document.getElementById('previewImg').src = selectedImageBase64;
+                    document.getElementById('previewFileName').innerText = file.name;
+                    document.getElementById('imagePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.cancelImage = function() {
+            selectedImageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreviewContainer').classList.add('hidden');
+        };
+
+        window.toggleRecordVoice = async function() {
+            const micIcon = document.getElementById('micIcon');
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = async function() {
+                            const newMsgRef = push(chatRef);
+                            await set(newMsgRef, {
+                                sender: currentIdentity,
+                                text: '',
+                                image: null,
+                                audio: reader.result,
+                                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                createdAt: Date.now(),
+                                edited: false
+                            });
+                        };
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micIcon.classList.remove('fa-microphone');
+                    micIcon.classList.add('fa-stop', 'text-red-500', 'animate-bounce');
+                } catch (err) {
+                    alert('माइक्रोफोन की अनुमति आवश्यक है।');
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                micIcon.classList.remove('fa-stop', 'text-red-500', 'animate-bounce');
+                micIcon.classList.add('fa-microphone');
+            }
+        };
+
+        function renderMessages(messagesObj) {
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = '';
+
+            const keys = Object.keys(messagesObj);
+            if (keys.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-500 my-auto text-sm">अभी कोई बातचीत नहीं है। शुरुआत करें! ✨</div>`;
+                return;
+            }
+
+            keys.sort((a, b) => messagesObj[a].createdAt - messagesObj[b].createdAt);
+
+            keys.forEach((key) => {
+                const msg = messagesObj[key];
+                const isMe = msg.sender === currentIdentity;
+                const alignment = isMe ? 'justify-end' : 'justify-start';
+                const bubbleStyle = isMe ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-2xl rounded-br-sm shadow-md' : 'bg-[#182533] text-gray-100 rounded-2xl rounded-bl-sm border border-[#2b3b4e] shadow-md';
+
+                let contentHtml = '';
+                if (msg.text) contentHtml += `<p class="text-sm leading-relaxed break-words font-normal">${escapeHtml(msg.text)}</p>`;
+                if (msg.image) contentHtml += `<img src="${msg.image}" alt="Photo" class="mt-2 rounded-xl max-h-60 object-cover cursor-pointer hover:opacity-95 transition shadow" onclick="window.open('${msg.image}')">`;
+                if (msg.audio) contentHtml += `<div class="mt-2"><audio controls class="h-9 w-48"><source src="${msg.audio}" type="audio/webm"></audio></div>`;
+
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `flex ${alignment} w-full`;
+                
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = `max-w-[85%] sm:max-w-md px-4 py-2.5 ${bubbleStyle} cursor-pointer relative`;
+                bubbleDiv.innerHTML = `
+                    <div class="text-[11px] font-bold text-sky-300 mb-0.5 tracking-wide">${escapeHtml(msg.sender)}</div>
+                    ${contentHtml}
+                    <div class="flex items-center justify-end gap-1.5 mt-1 text-[10px] text-gray-300 opacity-90">
+                        ${msg.edited ? '<span>(edited)</span>' : ''}
+                        <span>${msg.timestamp}</span>
+                    </div>
+                `;
+
+                if (isMe) {
+                    const startPress = () => { pressTimer = setTimeout(() => openActionModal(key), 600); };
+                    const cancelPress = () => clearTimeout(pressTimer);
+                    bubbleDiv.addEventListener('mousedown', startPress);
+                    bubbleDiv.addEventListener('touchstart', startPress);
+                    bubbleDiv.addEventListener('mouseup', cancelPress);
+                    bubbleDiv.addEventListener('mouseleave', cancelPress);
+                    bubbleDiv.addEventListener('touchend', cancelPress);
+                }
+
+                msgDiv.appendChild(bubbleDiv);
+                container.appendChild(msgDiv);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        window.openActionModal = function(msgKey) {
+            activeMessageKey = msgKey;
+            const msg = cachedMessages[msgKey];
+            document.getElementById('editOptionBtn').style.display = (msg && msg.text && !msg.audio) ? 'flex' : 'none';
+            document.getElementById('actionModal').classList.remove('hidden');
+        };
+
+        window.closeActionModal = function() {
+            document.getElementById('actionModal').classList.add('hidden');
+            activeMessageKey = null;
+        };
+
+        window.deleteSelectedMessage = async function() {
+            if (activeMessageKey !== null) {
+                try {
+                    await remove(ref(db, 'aya_ehe_dynamic_chats/' + activeMessageKey));
+                    closeActionModal();
+                } catch (err) {
+                    console.error("Delete Error:", err);
+                }
+            }
+        };
+
+        window.editSelectedMessage = function() {
+            if (activeMessageKey !== null) {
+                const msg = cachedMessages[activeMessageKey];
+                if (msg) {
+                    document.getElementById('messageInput').value = msg.text;
+                    document.getElementById('messageInput').focus();
+                    editingMsgKey = activeMessageKey;
+                    document.getElementById('sendBtn').innerHTML = '<i class="fa-solid fa-check text-sm"></i>';
+                }
+                closeActionModal();
+            }
+        };
+
+        function escapeHtml(string) {
+            return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>
